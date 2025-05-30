@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Control del Puente</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: linear-gradient(to right, #83a4d4, #b6fbff);
+      margin: 0;
+      padding: 2rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .container {
+      text-align: center;
+    }
+
+    h1 {
+      margin-bottom: 2rem;
+    }
+
+    .button-group {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 1rem;
+    }
+
+    button {
+      position: relative;
+      width: 60px;
+      height: 60px;
+      font-size: 1.5rem;
+      border: none;
+      border-radius: 50%;
+      background-color: #005f73;
+      color: white;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background-color: #0a9396;
+    }
+
+    button::after {
+      content: attr(data-label);
+      position: absolute;
+      bottom: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: rgba(0, 0, 0, 0.75);
+      color: #fff;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+
+    button:hover::after {
+      opacity: 1;
+    }
+
+    /* Estilos para los indicadores LED */
+    .led-indicators {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      margin-top: 2rem;
+    }
+
+    .led {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background-color: #ccc;
+      position: relative;
+      transition: background-color 0.3s;
+    }
+
+    .led.active {
+      background-color: #00ff00;
+      box-shadow: 0 0 10px #00ff00;
+    }
+
+    .led::after {
+      content: attr(data-side);
+      position: absolute;
+      bottom: -25px;
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 600px) {
+      button {
+        width: 50px;
+        height: 50px;
+        font-size: 1.2rem;
+      }
+
+      button::after {
+        font-size: 0.8rem;
+        bottom: -25px;
+      }
+
+      .led {
+        width: 15px;
+        height: 15px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Control del Puente</h1>
+    <div class="button-group">
+      <button onclick="connectBluetooth()" data-label="Conectar">🔗</button>
+      <button onclick="enviarComando('A')" data-label="Subir Lado 1">1️⃣</button>
+      <button onclick="enviarComando('B')" data-label="Subir Lado 2">2️⃣</button>
+      <button onclick="enviarComando('C')" data-label="Subir Ambos">🔼</button>
+      <button onclick="enviarComando('R')" data-label="Reiniciar">🔁</button>
+    </div>
+    <!-- Indicadores LED -->
+    <div class="led-indicators">
+      <div class="led" id="led1" data-side="Lado 1"></div>
+      <div class="led" id="led2" data-side="Lado 2"></div>
+    </div>
+  </div>
+
+  <script>
+    let device;
+    let characteristic;
+
+    async function connectBluetooth() {
+      try {
+        device = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: [0x1101]
+        });
+
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService(0x1101);
+        characteristic = await service.getCharacteristic(0x2A00);
+
+        alert("¡Conectado correctamente!");
+      } catch (error) {
+        console.error("Error al conectar:", error);
+        alert("Error de conexión: " + error);
+      }
+    }
+
+    function enviarComando(cmd) {
+      if (!characteristic) {
+        alert("Primero conecta vía Bluetooth");
+        return;
+      }
+
+      const encoder = new TextEncoder();
+      const data = encoder.encode(cmd);
+      characteristic.writeValue(data);
+
+      // Actualizar estado de los LEDs
+      actualizarLEDs(cmd);
+    }
+
+    function actualizarLEDs(cmd) {
+      const led1 = document.getElementById('led1');
+      const led2 = document.getElementById('led2');
+
+      switch(cmd) {
+        case 'A':
+          led1.classList.add('active');
+          led2.classList.remove('active');
+          break;
+        case 'B':
+          led1.classList.remove('active');
+          led2.classList.add('active');
+          break;
+        case 'C':
+          led1.classList.add('active');
+          led2.classList.add('active');
+          break;
+        case 'R':
+          led1.classList.remove('active');
+          led2.classList.remove('active');
+          break;
+      }
+    }
+  </script>
+</body>
+</html>
