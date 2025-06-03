@@ -3,13 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- Meta tags de seguridad para Bluetooth -->
-  <meta http-equiv="Permissions-Policy" content="bluetooth=self" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; connect-src 'self'" />
+  <!-- Política de seguridad mejorada para pruebas -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; connect-src *;" />
   <title>Control del Puente</title>
   <style>
     body {
-      font-family: sans-serif;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: linear-gradient(to right, #83a4d4, #b6fbff);
       margin: 0;
       padding: 2rem;
@@ -17,14 +16,18 @@
       justify-content: center;
       align-items: center;
       height: 100vh;
+      box-sizing: border-box;
     }
 
     .container {
       text-align: center;
+      max-width: 500px;
+      width: 100%;
     }
 
     h1 {
       margin-bottom: 2rem;
+      font-size: 2rem;
     }
 
     .button-group {
@@ -85,7 +88,7 @@
       border-radius: 50%;
       background-color: #ccc;
       position: relative;
-      transition: background-color 0.3s;
+      transition: background-color 0.3s, box-shadow 0.3s;
     }
 
     .led.active {
@@ -99,8 +102,8 @@
       bottom: -25px;
       left: 50%;
       transform: translateX(-50%);
-      white-space: nowrap;
       font-size: 0.9rem;
+      color: #000;
     }
 
     @media (max-width: 600px) {
@@ -118,6 +121,10 @@
       .led {
         width: 15px;
         height: 15px;
+      }
+
+      h1 {
+        font-size: 1.5rem;
       }
     }
   </style>
@@ -142,67 +149,46 @@
     let device;
     let characteristic;
 
-    // Función para verificar la disponibilidad de Bluetooth
-    async function checkBluetoothAvailability() {
-      try {
-        if (!navigator.bluetooth) {
-          throw new Error('Web Bluetooth API no está disponible en este navegador');
-        }
-        const available = await navigator.bluetooth.getAvailability();
-        if (!available) {
-          throw new Error('Bluetooth no está disponible en este dispositivo');
-        }
-        return true;
-      } catch (error) {
-        console.error('Error de disponibilidad:', error);
-        alert(error.message);
-        return false;
-      }
-    }
-
     async function connectBluetooth() {
       try {
-        // Verificar disponibilidad de Bluetooth
-        const isAvailable = await checkBluetoothAvailability();
-        if (!isAvailable) return;
-
-        // Verificar permisos
-        const permission = await navigator.permissions.query({ name: 'bluetooth' });
-        if (permission.state === 'denied') {
-          throw new Error('Permiso Bluetooth denegado');
+        if (!navigator.bluetooth) {
+          alert('Este navegador no soporta Web Bluetooth.');
+          return;
         }
 
-        // Solicitar dispositivo
+        const isAvailable = await navigator.bluetooth.getAvailability();
+        if (!isAvailable) {
+          alert('Bluetooth no está disponible en este dispositivo.');
+          return;
+        }
+
         device = await navigator.bluetooth.requestDevice({
           acceptAllDevices: true,
-          optionalServices: [0x1101]
+          optionalServices: [0x1101] // Puedes reemplazar por el UUID de tu dispositivo
         });
 
-        // Conectar al dispositivo
         const server = await device.gatt.connect();
         const service = await server.getPrimaryService(0x1101);
         characteristic = await service.getCharacteristic(0x2A00);
 
-        // Manejar desconexión
         device.addEventListener('gattserverdisconnected', onDisconnected);
 
-        alert("¡Conectado correctamente!");
+        alert("¡Dispositivo Bluetooth conectado con éxito!");
       } catch (error) {
-        console.error("Error al conectar:", error);
-        alert("Error de conexión: " + error.message);
+        console.error("Error de conexión:", error);
+        alert("Error al conectar: " + error.message);
       }
     }
 
     function onDisconnected() {
       console.log('Dispositivo desconectado');
       characteristic = null;
-      // Reiniciar LEDs
       actualizarLEDs('R');
     }
 
     async function enviarComando(cmd) {
       if (!characteristic) {
-        alert("Primero conecta vía Bluetooth");
+        alert("Primero debes conectar el dispositivo Bluetooth.");
         return;
       }
 
@@ -213,7 +199,7 @@
         actualizarLEDs(cmd);
       } catch (error) {
         console.error("Error al enviar comando:", error);
-        alert("Error al enviar comando: " + error.message);
+        alert("No se pudo enviar el comando: " + error.message);
       }
     }
 
@@ -221,7 +207,7 @@
       const led1 = document.getElementById('led1');
       const led2 = document.getElementById('led2');
 
-      switch(cmd) {
+      switch (cmd) {
         case 'A':
           led1.classList.add('active');
           led2.classList.remove('active');
