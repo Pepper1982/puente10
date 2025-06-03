@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Meta tags de seguridad para Bluetooth -->
+  <meta http-equiv="Permissions-Policy" content="bluetooth=self" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; connect-src 'self'" />
   <title>Control del Puente</title>
   <style>
     body {
@@ -69,7 +72,6 @@
       opacity: 1;
     }
 
-    /* Estilos para los indicadores LED */
     .led-indicators {
       display: flex;
       justify-content: center;
@@ -130,7 +132,6 @@
       <button onclick="enviarComando('C')" data-label="Subir Ambos">🔼</button>
       <button onclick="enviarComando('R')" data-label="Reiniciar">🔁</button>
     </div>
-    <!-- Indicadores LED -->
     <div class="led-indicators">
       <div class="led" id="led1" data-side="Lado 1"></div>
       <div class="led" id="led2" data-side="Lado 2"></div>
@@ -141,36 +142,79 @@
     let device;
     let characteristic;
 
+    // Función para verificar la disponibilidad de Bluetooth
+    async function checkBluetoothAvailability() {
+      try {
+        if (!navigator.bluetooth) {
+          throw new Error('Web Bluetooth API no está disponible en este navegador');
+        }
+        const available = await navigator.bluetooth.getAvailability();
+        if (!available) {
+          throw new Error('Bluetooth no está disponible en este dispositivo');
+        }
+        return true;
+      } catch (error) {
+        console.error('Error de disponibilidad:', error);
+        alert(error.message);
+        return false;
+      }
+    }
+
     async function connectBluetooth() {
       try {
+        // Verificar disponibilidad de Bluetooth
+        const isAvailable = await checkBluetoothAvailability();
+        if (!isAvailable) return;
+
+        // Verificar permisos
+        const permission = await navigator.permissions.query({ name: 'bluetooth' });
+        if (permission.state === 'denied') {
+          throw new Error('Permiso Bluetooth denegado');
+        }
+
+        // Solicitar dispositivo
         device = await navigator.bluetooth.requestDevice({
           acceptAllDevices: true,
           optionalServices: [0x1101]
         });
 
+        // Conectar al dispositivo
         const server = await device.gatt.connect();
         const service = await server.getPrimaryService(0x1101);
         characteristic = await service.getCharacteristic(0x2A00);
 
+        // Manejar desconexión
+        device.addEventListener('gattserverdisconnected', onDisconnected);
+
         alert("¡Conectado correctamente!");
       } catch (error) {
         console.error("Error al conectar:", error);
-        alert("Error de conexión: " + error);
+        alert("Error de conexión: " + error.message);
       }
     }
 
-    function enviarComando(cmd) {
+    function onDisconnected() {
+      console.log('Dispositivo desconectado');
+      characteristic = null;
+      // Reiniciar LEDs
+      actualizarLEDs('R');
+    }
+
+    async function enviarComando(cmd) {
       if (!characteristic) {
         alert("Primero conecta vía Bluetooth");
         return;
       }
 
-      const encoder = new TextEncoder();
-      const data = encoder.encode(cmd);
-      characteristic.writeValue(data);
-
-      // Actualizar estado de los LEDs
-      actualizarLEDs(cmd);
+      try {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(cmd);
+        await characteristic.writeValue(data);
+        actualizarLEDs(cmd);
+      } catch (error) {
+        console.error("Error al enviar comando:", error);
+        alert("Error al enviar comando: " + error.message);
+      }
     }
 
     function actualizarLEDs(cmd) {
